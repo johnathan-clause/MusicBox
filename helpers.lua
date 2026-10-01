@@ -30,7 +30,7 @@ local colors = require("constants").colors
 
 function buildHelpCommandEntry(command, description)
     local entry_template = "%s %s %s %s"
-    local short_name = "bs":color(colors.primary)
+    local short_name = "mb":color(colors.primary)
     local command = command:color(colors.secondary)
     local sep = "=>":color(colors.primary)
     local description = description:color(colors.info)
@@ -117,5 +117,5 @@ end
 function displayResponse(response, color)
     color = color or colors.info
     windower.add_to_chat(color, response)
-    windower.console.write(response:strip_colors())
+    --windower.console.write(response:strip_colors())
 end
