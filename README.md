@@ -53,6 +53,7 @@ The following aliases are available to Music Box commands:
 **stations:** station | s   
 **radios:** receivers | receiver | radio | r   
 > *Day* | *Night* | *Solo* | *Party* | *Mount*
+
 **all:** all | a | *   
 
 ___
