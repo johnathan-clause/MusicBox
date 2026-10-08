@@ -982,7 +982,7 @@ windower.register_event('addon command', function(command, ...)
         response_message = 'Defaults have been updated!'
         defaults.stations = settings.stations
         _config.save(defaults, 'all')
-        _config.save(settings)
+        _config.save(settings, 'all')
 
     elseif command == 'get' or command == 'g' then
 
