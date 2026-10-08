@@ -1,7 +1,7 @@
 _addon.name     = 'Music Box'
-_addon.description = 'Change or remove music.'
+_addon.description = 'A fork of the Windower 4 addon \'BattleStations\' that allows the user to change or remove not just the battle music, but all of the music in Final Fantasy 11 Online!'
 _addon.orignal_author   = 'Sjshovan (Apogee) sjshovan@gmail.com'
-_addon.author = 'Daywalker'
+_addon.author = 'daywalker'
 _addon.original_version  = '0.9.1'
 _addon.version = '1.1.0'
 _addon.commands = {'musicbox', 'mb'}
@@ -11,22 +11,26 @@ local _config  = require('config')
 local _packets = require('packets')
 local _res = require('resources')
 
+local _defaultsPath = 'data/defaults.xml'
+
 require('functions')
 require('constants')
 require('helpers')
 
 local hasZoned = false
 local tryMount = false
--- TODO: defaults need to be saved to .xml so they can be adjusted via commands and persist through sessions
-local defaults = {
-    stations = {
-        solo = 108.02,
-        party = 108.02,
+
+local defaults = _config.load(_defaultsPath, 
+{
+    stations = 
+    {
         day = 108.02,
-        night = 108.02,
+        night=  108.02,
+        solo = 108.06,
+        party = 108.06,
         mount = 108.05
     }
-}
+})
 
 local shuffle = 
 {
@@ -34,19 +38,22 @@ local shuffle =
     {
         seed = 0,
         tables = {},
-        keys = {}
+        keys = {},
+        last = 0
     },
     battle = 
     {
         seed = 0,
         tables = {},
-        keys = {}
+        keys = {}, 
+        last = 0
     },
     mount = 
     {
         seed = 0,
         tables = {},
-        keys = {}
+        keys = {}, 
+        last = 0
     }
 }
 
@@ -129,7 +136,7 @@ local help = {
     }
 }
 
-local settings = _config.load(defaults)
+local settings = _config.load(T(defaults))
 
 function displayHelp(table_help)
     for index, command in pairs(table_help) do
@@ -205,51 +212,24 @@ function getStations()
     return settings.stations
 end
 
-function setStation(radio, frequency, flag)
-    flag = flag or false
-    if flag then
-        if radio == stations.receivers.solo then
-            settings.stations.solo = frequency
-        elseif radio == stations.receivers.party then
-            settings.stations.party = frequency
-        elseif radio == stations.receivers.day then
-            if settings.stations.night == defaults.stations.night then
-                settings.stations.night = frequency
+function setStation(radio, frequency, ...)
+    local args = ...
+    local zone_id = tostring(windower.ffxi.get_info().zone)
+    local totd = getTOTD()
+    if not args then
+        if settings.stations[zone_id] then
+            settings.stations[zone_id][radio] = frequency
+        else
+            settings.stations[zone_id] = { [radio] = frequency }
+            if radio == 'day' and not settings.stations[zone_id]['night'] then
+                settings.stations[zone_id]['night'] = frequency
             end
-            settings.stations.day = frequency
-        elseif radio == stations.receivers.night then
-            if settings.stations.day == defaults.stations.day then
-                settings.stations.day = frequency
+            if radio == 'night' and not settings.stations[zone_id]['day'] then
+                settings.stations[zone_id]['day'] = frequency
             end
-            settings.stations.night = frequency
-        elseif radio == stations.receivers.mount then
-            settings.stations.mount = frequency
         end
     else
-        local zone_id = tostring(windower.ffxi.get_info().zone)
-        if settings.stations[zone_id] then
-            if radio == stations.receivers.solo then
-                settings.stations[zone_id].solo = frequency
-            elseif radio == stations.receivers.party then
-                settings.stations[zone_id].party = frequency
-            elseif radio == stations.receivers.day then
-                settings.stations[zone_id].day = frequency
-            elseif radio == stations.receivers.night then
-                settings.stations[zone_id].night = frequency
-            elseif radio == stations.receivers.mount then
-                settings.stations[zone_id].mount = frequency
-            end
-        else
-            settings.stations[zone_id] = 
-            { 
-                day = radio == stations.receivers.day and frequency or (radio == stations.receivers.night and frequency or defaults.stations.day), 
-                night = radio == stations.receivers.night and frequency or (radio == stations.receivers.day and frequency or defaults.stations.night), 
-                solo = radio == stations.receivers.solo and frequency or defaults.stations.solo, 
-                party = radio == stations.receivers.party and frequency or defaults.stations.party,
-                mount = radio == stations.receivers.mount and frequency or defaults.stations.mount
-            }
-            return setStation(radio, frequency, flag)
-        end
+        settings.stations[radio] = frequency
     end
     settings:save()
 end
@@ -267,44 +247,47 @@ function resolveCurrentStations()
         
         if s == zone_id then
 
-            for _,receiver in pairs(stations.receivers) do 
-                local r = tostring(receiver)
+            for r,station in pairs(current_stations[s]) do 
 
-                if not frequencyValid(current_stations[s][r]) then
-                    radio = r
-                    frequency = tostring(defaults.stations[r])
-                    current_stations[s][r] = defaults.stations[r]
+                if stations.receivers[current_stations] then
+                    if not frequencyValid(station) then
+                        radio = r
+                        frequency = tostring(defaults.stations[r])
+                        current_stations[s][r] = defaults.stations[r]
+                        
+                        setStation(radio, frequency)
+
+                        displayResponse(
+                            buildWarningMessage(
+                                message_template:format(
+                                    '%s.%s':format(s, r):color(colors.secondary),
+                                    frequency:color(colors.primary), 
+                                    getFrequencyObj(frequency).callSign
+                                )
+                            )
+                        )
+                    end
+                end 
+            end
+        else
+            if stations.receivers[s] then 
+                if not frequencyValid(f) then
+                    radio = s
+                    frequency = tostring(defaults.stations[s])
+                    current_stations[s] = defaults.stations[s]
                     
-                    setStation(radio, frequency)
-
+                    setStation(radio, frequency, true)
+                    
                     displayResponse(
                         buildWarningMessage(
                             message_template:format(
-                                '%s.%s':format(s, r):color(colors.secondary),
+                                radio:ucfirst():color(colors.secondary),
                                 frequency:color(colors.primary), 
                                 getFrequencyObj(frequency).callSign
                             )
                         )
                     )
                 end
-            end
-        else
-            if not frequencyValid(f) then
-                radio = s
-                frequency = tostring(defaults.stations[s])
-                current_stations[s] = defaults.stations[s]
-                
-                setStation(radio, frequency)
-                
-                displayResponse(
-                    buildWarningMessage(
-                        message_template:format(
-                            radio:ucfirst():color(colors.secondary),
-                            frequency:color(colors.primary), 
-                            getFrequencyObj(frequency).callSign
-                        )
-                    )
-                )
             end
         end
     end
@@ -317,18 +300,24 @@ function injectMusicPacket(radio, ...)
     local station = resolveCurrentStations()[radio]
     local song = 0
 
-    if radio == zone_id then 
-        for k,v in pairs(station) do
+    if settings.stations[zone_id] then 
+        local c, r, f = getConditionalObj(...)
+        if settings.stations[zone_id][r] then
+            song = getConditionalSongTranslation(getFrequencyObj(f).song, r, f, ...)
+
+            getResponse(r, f, ...)
+
+            if r == stations.receivers.mount and shuffle[c].last ~= song then shuffle[c].last = song end
+
             _packets.inject(_packets.new('incoming', packets.inbound.music_change.id, 
             {
-                ['BGM Type'] = music_types[k],
-                ['Song ID'] = getConditionalSongTranslation(getFrequencyObj(v).song, k, v, ...)
+                ['BGM Type'] = music_types[r],
+                ['Song ID'] = song
             }))
         end
     else
-        song = getFrequencyObj(station).song
-        song = getConditionalSongTranslation(song, radio, station, ...)
-        
+        song = getConditionalSongTranslation(getFrequencyObj(station).song, radio, station, ...)
+        getResponse(radio, station, ...)
         _packets.inject(_packets.new('incoming', packets.inbound.music_change.id, {
         ['BGM Type'] = music_types[radio],
         ['Song ID'] = song
@@ -381,11 +370,11 @@ end
 function getMusicTable()
     local t = 
     {
-        solo    = 0,
-        party   = 0,
-        day     = 0,
-        night   = 0,
-        mount   = 0
+        solo    = 9999,
+        party   = 9999,
+        day     = 9999,
+        night   = 9999,
+        mount   = 9999
     }
     local zone_id = tostring(windower.ffxi.get_info().zone)
     local current_stations = resolveCurrentStations()
@@ -394,17 +383,18 @@ function getMusicTable()
     if current_stations[zone_id] then
         local station = current_stations[zone_id]
         
-        for _,r in pairs(stations.receivers) do 
-            song = getFrequencyObj(station[r]).song
-            song = getConditionalSong(r, station[r])
+        for r, f in pairs(station) do 
+            song = getFrequencyObj(f).song
+            song = getConditionalSongTranslation(song, r, f)
             t[r] = song
         end
     else
-        for _,r in pairs(stations.receivers) do 
-            local f = current_stations[r]
-            song = getFrequencyObj(f).song
-            song = getConditionalSong(r, f)
-            t[r] = song
+        for r, f in pairs(current_stations) do 
+            if type(f) == type(0) then
+                song = getFrequencyObj(f).song
+                song = getConditionalSongTranslation(song, r, f)
+                t[r] = song
+            end
         end
     end
 
@@ -449,6 +439,7 @@ end
 function getConditionalSong(radio, station)
     local zone_bgm_table = getZoneBGMTable()
     local zone_id = tostring(windower.ffxi.get_info().zone)
+    local zone_stations = settings.stations[zone_id]
     local totd = getTOTD()
 
     local radio_conditional_table = 
@@ -456,41 +447,41 @@ function getConditionalSong(radio, station)
         ['solo'] = 
         {
             ['108.02'] = zone_bgm_table.solo,
-            ['108.03'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id][totd]).song or (settings.stations[totd] and getFrequencyObj(settings.stations[totd]).song or zone_bgm_table[totd]),
-            ['108.04'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
-            ['108.05'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.03'] = (zone_stations and zone_stations[totd]) and getFrequencyObj(zone_stations[totd]).song or (settings.stations[totd] and getFrequencyObj(settings.stations[totd]).song or zone_bgm_table[totd]),
+            ['108.04'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.05'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
             ['108.06'] = shuffle['battle'].tables['battle'][shuffle['battle'].keys['solo']].song,
         },
         ['party'] = 
         {
             ['108.02'] = zone_bgm_table.party,
-            ['108.03'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id][totd]).song or (settings.stations[totd] and getFrequencyObj(settings.stations[totd]).song or zone_bgm_table[totd]),
-            ['108.04'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
-            ['108.05'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.03'] = (zone_stations and zone_stations[totd]) and getFrequencyObj(zone_stations[totd]).song or (settings.stations[totd] and getFrequencyObj(settings.stations[totd]).song or zone_bgm_table[totd]),
+            ['108.04'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.05'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
             ['108.06'] = shuffle['battle'].tables['battle'][shuffle['battle'].keys['party']].song,
         },
         ['day'] = 
         {
             ['108.02'] = zone_bgm_table.day,
-            ['108.03'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].day).song or (settings.stations.day and getFrequencyObj(settings.stations.day).song or zone_bgm_table.day),
-            ['108.04'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
-            ['108.05'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.03'] = (zone_stations and zone_stations[totd]) and getFrequencyObj(zone_stations.day).song or (settings.stations.day and getFrequencyObj(settings.stations.day).song or zone_bgm_table.day),
+            ['108.04'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.05'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
             ['108.06'] = shuffle['zone'].tables['zone'][shuffle['zone'].keys['day']].song,
         },
         ['night'] = 
         {
             ['108.02'] = zone_bgm_table.night,
-            ['108.03'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].night).song or (settings.stations.night and getFrequencyObj(settings.stations.night).song or zone_bgm_table.night),
-            ['108.04'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
-            ['108.05'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.03'] = (zone_stations and zone_stations[totd]) and getFrequencyObj(zone_stations.night).song or (settings.stations.night and getFrequencyObj(settings.stations.night).song or zone_bgm_table.night),
+            ['108.04'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.05'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
             ['108.06'] = shuffle['zone'].tables['zone'][shuffle['zone'].keys['night']].song,
         },
         ['mount'] = 
         {
             ['108.02'] = zone_bgm_table.mount,
-            ['108.03'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id][totd]).song or (settings.stations[totd] and getFrequencyObj(settings.stations[totd]).song or zone_bgm_table[totd]),
-            ['108.04'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
-            ['108.05'] = settings.stations[zone_id] and getFrequencyObj(settings.stations[zone_id].mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.03'] = (zone_stations and zone_stations[totd]) and getFrequencyObj(zone_stations[totd]).song or (settings.stations[totd] and getFrequencyObj(settings.stations[totd]).song or zone_bgm_table[totd]),
+            ['108.04'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
+            ['108.05'] = (zone_stations and zone_stations.mount) and getFrequencyObj(zone_stations.mount).song or (settings.stations.mount and getFrequencyObj(settings.stations.mount).song or zone_bgm_table.mount),
             ['108.06'] = shuffle['mount'].tables['mount'][shuffle['mount'].keys['mount']].song,
         },
     }
@@ -526,19 +517,19 @@ function getConditionalObj(...)
         c = 'mount'
         r = 'mount'
     end
-    
     if(totd == stations.receivers.day and playerHasZoned() and not has_args) or args['day'] then
         c = 'zone'
         r = 'day'
-    elseif (totd == stations.receivers.night and playerHasZoned() and not has_args) or args['night'] then
+    end
+    if (totd == stations.receivers.night and playerHasZoned() and not has_args) or args['night'] then
         c = 'zone'
         r = 'night'
     end
-
     if (playerInParty() and playerIsFighting() and not has_args) or args['party'] then
         c = 'battle'
         r = 'party'
-    elseif (playerIsFighting() and not has_args) or args['solo'] then
+    end
+    if (playerIsFighting() and not has_args) or args['solo'] then
         c = 'battle'
         r = 'solo'
     end
@@ -554,9 +545,11 @@ end
 
 function getConditionalResponse(...)
     local c, r, f = getConditionalObj(...)
+    
     if not c then return false end
 
     local zone_bgm_table = getZoneBGMTable()
+    
     local response_table = 
     {
         ['108.01'] = 0,
@@ -566,6 +559,7 @@ function getConditionalResponse(...)
         ['108.05'] = stations.frequencies['108.05'].song,
         ['108.06'] = shuffle[c].tables[c][shuffle[c].keys[r]].song,
     }
+    if not response_table[f] then return false end
     local obj, station = getFrequencyObjBySong(response_table[f])
 
     local response_message = buildSetResponseMessage(
@@ -588,12 +582,6 @@ function getConditionalSongTranslation(song, radio, station, ...)
         return song
     end
     
-    local response = getConditionalResponse(...)
-    
-    if response then
-        displayResponse(buildCommandResponse(response, true))
-    end
-    
     return getConditionalSong(radio, station)
 end
 
@@ -606,11 +594,6 @@ function timeIsDaytime()
     return current_time >= 6*60 and current_time <= 18*60
 end
 
--- DEPRECATE: has no use?
-function playerIsIdle()
-    return windower.ffxi.get_player().status == player.statuses.idle
-end
-
 function playerIsFighting()
     return windower.ffxi.get_player().status == player.statuses.fighting
 end
@@ -620,7 +603,7 @@ function playerInParty()
     return party_size and party_size > 1
 end
 
--- DEPRECATE: has no use case?
+-- TODO: reimplement logic for this
 function playerInReive()
     return getPlayerBuffs():contains(player.buffs.reiveMark)
 end
@@ -664,6 +647,11 @@ function listTypeValid(list_type)
     return help.lists[list_type] ~= nil
 end
 
+function printTable(table)
+    for k,v in pairs(table) do
+        print('k: %s v: %s':format(tostring(k), tostring(v)))
+    end
+end
 function getArgs(args, arg_table)
     local t = arg_table
     for k,v in pairs(args) do
@@ -680,21 +668,19 @@ function hasArgs(args, arg_table)
     return false
 end
 
---TODO: replace all equivalent logic with this
 function getResponse(radio, frequency, ...)
-    radio = radio or 'solo'
+    local r = radio or 'solo'
     frequency = frequency or '108.02'
     local respond = getConditionalResponse(...)
-
-    if not respond then
-        response_message = buildSetResponseMessage(
-                                radio:ucfirst(), 
+    local response_message = buildSetResponseMessage(
+                                r:ucfirst(), 
                                 'radio', 
                                 frequency, 
-                                getFrequencyObj(frequency).callSign
+                                getFrequencyObj(frequency).callSign:color(colors.secondary)
                             )..'.'
-    else
-        response_message = respond
+
+    if respond then
+        response_message = getConditionalResponse(...)
     end
 
     displayResponse(
@@ -745,6 +731,14 @@ function updateShuffle(...)
     end
 end
 
+function tryLoad()
+    playerHasZoned(1)
+    local cond_args = {}
+    if playerIsMounted() then cond_args = {['mount'] = true} end
+    requestInject()
+    handleInjectionNeeds(cond_args)
+end
+
 function requestInject() 
     needs_inject = true
 end
@@ -757,96 +751,38 @@ end
 
 function handleInjectionNeeds(...) 
     local c, r, f = getConditionalObj(...)
+    local zone_id = tostring(windower.ffxi.get_info().zone)
 
-    if needs_inject and c then
+    if needs_inject and settings.stations[zone_id] then
+        injectMusicPacket(zone_id, ...)
+        needs_inject = false
+    end
+    
+    if needs_inject and c then    
         for k,v in pairs(settings.stations) do 
             if r == k then injectMusicPacket(k, ...) end
         end
-
-        playerHasZoned(0) 
         needs_inject = false
     end
+
+    playerHasZoned(0) 
 end
 
-windower.register_event('load', function () 
-    playerHasZoned(1)
+windower.register_event('load', 'login', function() 
     initShuffle()
-    local cond_args = {} --
-    if playerIsMounted() then --
-       cond_args = {['mount'] = true}--
+    if windower.ffxi.get_player() ~= nil then
+        tryLoad()
     end
-    requestInject()
-    handleInjectionNeeds(cond_args)--
 end)
 
--- TODO: needs to accoutn for all changes instead of just battle stations
 windower.register_event('unload', function() 
-    local music_type = music.types.battle_solo
     local zone_bgm_table = getZoneBGMTable()
-    local song = zone_bgm_table.solo
-    
-    if playerInParty() then
-       music_type = music.types.battle_party
-       song = zone_bgm_table.party
-    end
-                   
-    _packets.inject(_packets.new('incoming', packets.inbound.music_change.id, {
-        ['BGM Type'] = music_type,
-        ['Song ID'] = song,
-    }))
-end)
 
--- TODO: use coroutine and combine into one register_event
-windower.register_event('incoming chunk', function(id, data) 
-if id == packets.inbound.music_change.id then
-        local packet = _packets.parse('incoming', data)
-        if packet['BGM Type'] == music.types.mount and tryMount then
-            local music_table = getMusicTable()
-            packet['Song ID'] = music_table.mount
-
-            tryMount = false
-            return _packets.build(packet)
-        end        
-    end    
-end)
-windower.register_event('incoming chunk', function(id, data) 
-    
-    if id == packets.inbound.zone_update.id then
-        local packet = _packets.parse('incoming', data)
-
-        if windower.ffxi.get_player().id == packet.Player then
-            playerHasZoned(1)
-            local totd = getTOTD()
-            local cond_args = {}
-            local response = false
-
-            if playerIsMounted() then
-                --cond_args = {['mount'] = true}
-                --response = getConditionalResponse(cond_args)
-                updateShuffle({[totd] = true})
-            else
-                --updateShuffle({['day'] = true})
-                cond_args = {[totd] = true}
-                response = getConditionalResponse(cond_args)
-                updateShuffle(cond_args)
-            end
-            
-            local music_table = getMusicTable()
-            packet['Solo Combat Music'] = music_table.solo
-            packet['Party Combat Music'] = music_table.party
-            packet['Day Music'] = music_table.day
-            packet['Night Music'] = music_table.night
-            packet['Mount Music'] = music_table.mount
-
-            
-    
-            if response then
-                displayResponse(buildCommandResponse(response, true))
-            end
-
-            playerHasZoned(0)
-            return _packets.build(packet)
-        end
+    for r in pairs(stations.receivers) do 
+        _packets.inject(_packets.new('incoming', packets.inbound.music_change.id, {
+            ['BGM Type'] = music_types[r],
+            ['Song ID'] = zone_bgm_table[r],
+        }))
     end
 end)
 
@@ -870,7 +806,8 @@ windower.register_event('gain buff', function(id)
     end
 end)
 
-windower.register_event('outgoing chunk', function(id, data)
+windower.register_event('outgoing chunk', function(id, data)   
+    if not data then return end
     if id == packets.outbound.action.id then
         local packet = _packets.parse('outgoing', data)
 
@@ -886,7 +823,69 @@ windower.register_event('outgoing chunk', function(id, data)
     end
 end) 
 
+windower.register_event('incoming chunk', function(id, data) 
+    if not data then return end
+    if id == packets.inbound.music_change.id then
+        local packet = _packets.parse('incoming', data)
+        if packet['BGM Type'] == music.types.mount and tryMount then
+            local music_table = getMusicTable()
+            packet['Song ID'] = music_table.mount
+
+            tryMount = false
+            shuffle.mount.last = music_table.mount
+            return _packets.build(packet)
+        end 
+    end
+end)
+
+windower.register_event('incoming chunk', function(id, data) 
+    if not data then return end
+    if id == packets.inbound.zone_update.id then
+        local packet = _packets.parse('incoming', data)
+
+        if windower.ffxi.get_player().id == packet.Player then
+            playerHasZoned(1)
+            local totd = getTOTD()
+            local cond_args = {}
+            local music_table = getMusicTable()
+            local zone_id = tostring(windower.ffxi.get_info().zone)
+
+            if playerIsMounted() then
+                updateShuffle({[totd] = true})
+                music_table = getMusicTable()
+                if shuffle.mount.last ~= music_table.mount then
+                    shuffle.mount.last = music_table.mount
+                    local obj, f = getFrequencyObjBySong(music_table.mount)
+
+                    getResponse('mount', f, {['mount'] = true})
+                end
+            else
+                cond_args = {[totd] = true}
+                updateShuffle(cond_args)
+                music_table = getMusicTable()
+                
+                if shuffle.zone.last ~= music_table[totd] then
+                    shuffle.zone.last = music_table[totd]
+                    local obj, f = getFrequencyObjBySong(music_table[totd])
+                    
+                    getResponse(totd, f, cond_args)
+                end
+            end
+            
+            packet['Solo Combat Music'] = music_table.solo
+            packet['Party Combat Music'] = music_table.party
+            packet['Day Music'] = music_table.day
+            packet['Night Music'] = music_table.night
+            packet['Mount Music'] = music_table.mount
+
+            playerHasZoned(0)
+            return _packets.build(packet)
+        end
+    end
+end)
+
 windower.register_event('addon command', function(command, ...)
+
     if command then
         command = command:lower()
     else 
@@ -895,7 +894,7 @@ windower.register_event('addon command', function(command, ...)
     end
 
     local command_args = {...}
-    
+    local cond_args = {}
     local respond = false
     local response_message = ''
     local success = true
@@ -904,14 +903,14 @@ windower.register_event('addon command', function(command, ...)
     local frequency = ''
 
     if command == 'list' or command == 'l' then
-        local list_type = (command_args[1] or 'solo'):lower()
+
+        local list_type = command_args[1] and command_args[1]:lower() or nil
         local category = command_args[2]
         
         if help.aliases.list.stations:contains(list_type) then
             if category then
                 if categoryValid(category) then
                     displayStations(category)
-                
                 else
                    respond = true
                    success = false
@@ -920,188 +919,128 @@ windower.register_event('addon command', function(command, ...)
             else 
                 displayStations()
             end       
-        
         elseif help.aliases.list.radios:contains(list_type) then 
             displayHelp(help.radios)
-            
         elseif help.aliases.list.categories:contains(list_type) then
             displayCategories()
-        
         elseif help.aliases.list.all:contains(list_type) then
             displayHelp(help.radios)
             displayStations()
-        
         else 
             respond = true
             success = false
             response_message = 'List type not recognized.'
-        end
-        
+        end    
+
     elseif command == 'set' or command == 's' then
-        respond = true
-        
-        frequency = tostring(command_args[1]:lower())
-     
-        radio = tostring((command_args[2] or 'solo'):lower())
+
+        frequency = command_args[1] and command_args[1]:lower() or nil
+        radio = command_args[2] and command_args[2]:lower() or nil
         
         if not frequencyValid(frequency) then
+            respond = true
             success = false
             response_message = 'Frequency not recognized.'
-        
         elseif not radioValid(radio) then
+            respond = true
             success = false
             response_message = 'Radio not recognized.'           
         else 
             needs_inject = true
 
-            local cond_args = {[radio] = true}
-            local context = 'radio'
-            
             setStation(radio, tonumber(frequency))
-            
-            if not getConditionalResponse(cond_args) then
-                response_message = buildSetResponseMessage(
-                    radio:ucfirst(), 
-                    context, 
-                    frequency, 
-                    getFrequencyObj(frequency).callSign
-                )..'.'
-            else
-                updateShuffle(cond_args)
-                --response_message = getConditionalResponse(cond_args)
-                respond = false
-            end
+            cond_args = {[radio] = true}
+            updateShuffle(cond_args)
+            radio = zone_id
         end
+
     elseif command == 'setglobal' or command == 'sg' then
-        respond = true
-        frequency = tostring(command_args[1]:lower())
-        radio = tostring((command_args[2] or 'solo'):lower())
+
+        frequency = command_args[1] and command_args[1]:lower() or nil
+        radio = command_args[2] and command_args[2]:lower() or nil
+
         if not frequencyValid(frequency) then
+            respond = true
             success = false
             response_message = 'Frequency not recognized.'
-        
         elseif not radioValid(radio) then
+            respond = true
             success = false
             response_message = 'Radio not recognized.'           
         else 
             needs_inject = true
             
-            local cond_args = {[radio] = true}
-            local context = 'radio'
-            local response_radio = radio:ucfirst()
-            
             setStation(radio, tonumber(frequency), true)
-            
-            if not getConditionalResponse(cond_args) then
-                response_message = buildSetResponseMessage(
-                    response_radio, 
-                    context, 
-                    frequency, 
-                    getFrequencyObj(frequency).callSign
-                )..'.'
-            else
-                updateShuffle(cond_args)
-                --response_message = getConditionalResponse(cond_args)
-                respond = false
-            end
+            cond_args = {[radio] = true}
+            updateShuffle(cond_args)
         end
+
     elseif command == 'savedefaults' or command == 'sd' then
+
         respond = true
         needs_inject = true
         response_message = 'Defaults have been updated!'
-        defaults = settings
-        settings:save('all')
+        defaults.stations = settings.stations
+        _config.save(defaults, 'all')
+        _config.save(settings)
+
     elseif command == 'get' or command == 'g' then
-        respond = true
-        
+
         local current_stations = resolveCurrentStations()
-        radio = (command_args[1] or 'solo'):lower()
-        frequency = current_stations[radio]
-        local frequency2 = current_stations.party
-        local individual = false
+        radio = command_args[1] and command_args[1]:lower() or nil
         
         if not radioValid(radio) then
+            respond = true
             success = false
             response_message = 'Radio not recognized.'
         else
-            local context = 'radio is'
-            
-            if not individual then
-                response_message = buildGetResponseMessage(
-                    radio:ucfirst(), 
-                    context, 
-                    frequency, 
-                    getFrequencyObj(frequency).callSign
-                )..'.'
-   
+            if current_stations[zone_id] and current_stations[zone_id][radio] then
+                frequency = current_stations[zone_id][radio]
             else
-                local solo_message = buildGetResponseMessage(
-                    stations.receivers.solo:ucfirst(), 
-                    context, 
-                    frequency, 
-                    getFrequencyObj(frequency).callSign
-                )
-                
-                local party_message = buildGetResponseMessage(
-                   stations.receivers.party:ucfirst(), 
-                   context, 
-                   frequency2, 
-                   getFrequencyObj(frequency2).callSign
-                )
-                
-                response_message = solo_message..' and '..party_message..'.'
-            end    
+                frequency = current_stations[radio]
+            end
+
+            getResponse(radio, frequency, {[radio] = true})
         end
 
     elseif command == 'default' or command == 'd' then
-        respond = true 
+
         needs_inject = true
         settings = defaults
         response_message = 'Settings have been reset!'
-       
+
     elseif command == 'normal' or command == 'n' then
+
         respond = true 
-        
-        radio = (command_args[1] or 'solo'):lower()
+        radio = command_args[1] and command_args[1]:lower() or nil
         
         if not radioValid(radio) then
             success = false
             response_message = 'Radio not recognized.'           
         else
             needs_inject = true
-        
             frequency = '108.02'
-            local context = 'radio'
             
             setStation(radio, tonumber(frequency))
-
-            local cond_args = {[radio] = true}
-
-            if not getConditionalResponse(cond_args) then
-                response_message = buildSetResponseMessage(
-                    radio:ucfirst(), 
-                    context, 
-                    frequency, 
-                    getFrequencyObj(frequency).callSign
-                )..'.'
-            else
-                updateShuffle(cond_args)
-                --response_message = getConditionalResponse(cond_args)
-                respond = false
-            end
+            cond_args = {[radio] = true}
         end
         
     elseif command == 'reload' or command == 'r' then
+
         windower.send_command('lua r musicbox')
         
     elseif command == 'about' or command == 'a' then
+
         displayHelp(help.about)
 
     elseif command == 'help' or command == 'h' then
+
         displayHelp(help.commands)
              
     else
+
         displayHelp(help.commands)
+
     end
 
     if respond then
@@ -1110,5 +1049,5 @@ windower.register_event('addon command', function(command, ...)
         )
     end
 
-    handleInjectionNeeds({[radio] = true})
+    handleInjectionNeeds(cond_args)
 end) 
