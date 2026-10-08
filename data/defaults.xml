@@ -1,0 +1,12 @@
+<?xml version="1.1" ?>
+<settings>
+    <global>
+        <stations>
+            <day>108.02</day>
+            <mount>108.05</mount>
+            <night>108.02</night>
+            <party>108.06</party>
+            <solo>108.06</solo>
+        </stations>
+    </global>
+</settings>
