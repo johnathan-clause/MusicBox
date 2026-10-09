@@ -210,6 +210,10 @@ ___
 
 - **Issue:** During campaign battles in the past, the music switches from the campaign music to the normal zone music while stations are set to `108.03`.
 
+- **Issue:** Loads global music over zone music on first login only. Zoning or reloading fixes any discrepencies.
+
+- **Issue:** Time of day change does not apply music box settings at the moment.
+
 ___    
 ### TODOS
 
