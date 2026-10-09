@@ -217,7 +217,9 @@ ___
 ___    
 ### TODOS
 
-- **TODO:** 
+- **TODO:** Fix reive logic.
+
+- **TODO:** Find better way to track zoning.
 ___
 
 ### License
