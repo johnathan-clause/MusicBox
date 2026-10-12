@@ -1457,22 +1457,22 @@ stations = {
         },
         ['108.03'] = {
             musicType = 'system', 
-            callSign = 'Current Zone Music (Default)',
+            callSign = 'Current Music',
             song = music.songs.system.zone
         },
         ['108.04'] = {
             musicType = 'system', 
-            callSign = 'Mount',
+            callSign = 'Mount Music',
             song = music.songs.system.mount
         },
         ['108.05'] = {
             musicType = 'system', 
-            callSign = 'Chocobo',
+            callSign = 'Chocobo Music',
             song = music.songs.system.chocobo
         },
         ['108.06'] = {
             musicType = 'system', 
-            callSign = 'Shuffle',
+            callSign = 'Shuffle Music',
             song = music.songs.system.shuffle
         },
     }
