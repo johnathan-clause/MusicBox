@@ -201,8 +201,11 @@ ___
 ___
 ### Change Log
 
+**v1.1.0a** - 10/01/2026
+- A few fixes for minor issues
+
 **v1.1.0** - 10/01/2026
-- No need for Autoex or other tools
+- First official release
 
 **v1.0.0** - 10/01/2026
 - Initial release
