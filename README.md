@@ -37,6 +37,7 @@ ___
 3. Click on the `Source code (zip)` link within the latest release to download.
 4. Place the .zip into your windower directory. 
 5. Right-click the .zip file and select *Extract here*, if prompted to replace files or directories select *Yes to all*.
+6. Use `lua load musicbox` to load the addon.
 
 ___
 ### Aliases
