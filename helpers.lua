@@ -31,47 +31,48 @@ local colors = require("constants").colors
 function buildHelpCommandEntry(command, description)
     local entry_template = "%s %s %s %s"
     local short_name = "mb":color(colors.primary)
-    local command = command:color(colors.secondary)
-    local sep = "=>":color(colors.primary)
-    local description = description:color(colors.info)
+    local command = command:color(colors.warn)
+    local sep = "=>":color(colors.info)
+    local description = description:color(colors.secondary)
     return entry_template:format(short_name, command, sep, description)
 end
 
 function buildHelpTypeEntry(name, description)
     local entry_template = "%s %s %s"
-    local name = name:color(colors.secondary)
-    local sep = "=>":color(colors.primary)
-    local description = description:color(colors.info)
+    local name = name:color(colors.primary)
+    local sep = "=>":color(colors.info)
+    local description = description:color(colors.secondary)
     return entry_template:format(name, sep, description)
 end
 
 function buildHelpRadioEntry(name, description)
     local entry_template = "%s %s %s"
-    local name = name:color(colors.secondary)
-    local sep = "=>":color(colors.primary)
-    local description = description:color(colors.info)
+    local name = name:color(colors.primary)
+    local sep = "=>":color(colors.info)
+    local description = description:color(colors.secondary)
     return entry_template:format(name, sep, description)
 end
 
 function buildHelpStationEntry(frequency, callSign)
     local entry_template = "  %s %s %s"
-    local frequency = frequency:color(colors.secondary)
-    local sep = "=>":color(colors.primary)
-    local callSign = callSign:color(colors.info)
+    local frequency = frequency:color(colors.primary)
+    local sep = "=>":color(colors.info)
+    local callSign = callSign:color(colors.secondary    )
     return entry_template:format(frequency, sep, callSign)
 end
 
 function buildHelpStationCategoryEntry(range, name)
     local entry_template = "(%s) %s"
-    local range = range:color(colors.primary)
-    local name = name:color(colors.danger)
+    local range = range:color(colors.warn)
+    local name = name:color(colors.info)
     return entry_template:format(range, name)
 end
 
 function buildHelpTitle(context)
-    local title_template = "%s Help: %s"
-    local context = context:color(colors.danger)
-    return title_template:color(colors.primary):format(_addon.name, context)
+    local text = "Help:":color(colors.success)
+    local name = _addon.name:color(colors.success)
+    local context = context:color(colors.info)
+    return '%s %s %s':format(name, text, context)
 end
 
 function buildHelpSeperator(character, count)
@@ -79,7 +80,7 @@ function buildHelpSeperator(character, count)
     for i = 1, count do
         sep = sep .. character
     end
-    return sep:color(colors.warn)
+    return sep:color(colors.info)
 end
 
 function buildCommandResponse(message, success)
