@@ -316,6 +316,14 @@ end
 
 function injectMusicPacket(radio, ...)
     local zone_id = tostring(windower.ffxi.get_info().zone)
+    local cat_table = 
+    {
+        ['day'] = 'zone',
+        ['night'] = 'zone',
+        ['solo'] = 'battle',
+        ['party'] = 'battle',
+        ['mount'] = 'mount',
+    }
     local station = resolveCurrentStations()[radio]
     local song = 0
 
@@ -328,9 +336,8 @@ function injectMusicPacket(radio, ...)
 
         song = getConditionalSongTranslation(getFrequencyObj(station).song, radio, station, ...)
         getResponse(radio, station, ...)
-        
-        if radio == stations.receivers.mount and shuffle.mount.last ~= song then shuffle.mount.last = song end
 
+        shuffle[cat_table[radio]].last = song
         _packets.inject(_packets.new('incoming', packets.inbound.music_change.id, 
         {
             ['BGM Type'] = music_types[radio],
@@ -339,6 +346,7 @@ function injectMusicPacket(radio, ...)
     else
         song = getConditionalSongTranslation(getFrequencyObj(station).song, radio, station, ...)
         getResponse(radio, station, ...)
+        shuffle[cat_table[radio]].last = song
         _packets.inject(_packets.new('incoming', packets.inbound.music_change.id, {
         ['BGM Type'] = music_types[radio],
         ['Song ID'] = song
@@ -602,18 +610,19 @@ function getConditionalResponse(...)
     if not c then return false end
 
     local zone_bgm_table = getZoneBGMTable()
-    
     local response_table = 
     {
-        ['108.01'] = 0,
+        ['108.01'] = 9999,
         ['108.02'] = zone_bgm_table[r],
         ['108.03'] = zone_bgm_table[getTOTD()],
         ['108.04'] = stations.frequencies['108.04'].song,
         ['108.05'] = stations.frequencies['108.05'].song,
         ['108.06'] = shuffle[c].tables[c][shuffle[c].keys[r]].song,
     }
-    if not response_table[f] then return false end
-    local obj, station = getFrequencyObjBySong(response_table[f])
+    local response = response_table[f]
+    if not response then return false end
+    if response == 0 then response = 9999 end
+    local obj, station = getFrequencyObjBySong(response)
 
     local response_message = buildSetResponseMessage(
                                 r:ucfirst(), 
@@ -889,22 +898,34 @@ windower.register_event('time change', function(new, old)
         end
     end
 
+    
     if time_table.day.start == new or time_table.night.start == new then
-        _packets.inject(_packets.new('incoming', packets.inbound.music_change.id, 
-        {
-            ['BGM Type'] = music_types[getTOTD()],
-            ['Song ID'] = 9999,
-        }))
+        local music_table = getMusicTable()
+        local _time = {[360] = 'day', [1080] = 'night'}
+        local totd = _time[new]
+
+        if shuffle.zone.last ~= music_table[totd] then
+            _packets.inject(_packets.new('incoming', packets.inbound.music_change.id, 
+            {
+                ['BGM Type'] = music_types[totd],
+                ['Song ID'] = 9999,
+            }))
+        end
     end
     if time_table.day.start == old or time_table.night.start == old then
-        tryInject()
+        local music_table = getMusicTable()
+        local _time = {[360] = 'day', [1080] = 'night'}
+        local totd = _time[old]
+
+        if shuffle.zone.last ~= music_table[totd] then
+            tryInject({[totd] = true})
+        end
     end
 end)
 
 windower.register_event('gain buff', function(id) 
     if id == player.buffs.mounted then 
         tryInject({['mount'] = true})
-        shuffle.mount.last = getMusicTable()['mount']
     end
 end)
 
