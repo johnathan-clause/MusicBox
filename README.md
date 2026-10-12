@@ -1,6 +1,7 @@
 **BattleStations Author:** [Sjshovan (Apogee)](https://github.com/Ap0gee)  
 
-**MusicBox Author:** [Johnathan Clause(daywalker)](https://github.com/johnathan-clause)
+**MusicBox Author:** [Johnathan Clause (daywalker)](https://github.com/johnathan-clause)
+
 **Version:** v1.1.0  
 
 
@@ -219,7 +220,6 @@ ___
 
 - **TODO:** Fix reive logic.
 
-- **TODO:** Find better way to track zoning.
 ___
 
 ### License
