@@ -1056,6 +1056,7 @@ windower.register_event('addon command', function(command, ...)
         defaults.stations = settings.stations
         _config.save(defaults, 'all')
         _config.save(settings, 'all')
+        windower.send_command('lua r musicbox')
 
     elseif command == 'get' or command == 'g' then
 
