@@ -34,15 +34,15 @@ ___
 **Manual:**
 1.   Navigate to <https://github.com/johnathan-clause/MusicBox>.
 2.   Click on `Releases`.
-3.
-    a.  Click on the `MusicBox-vX.X.X.zip` link within the latest release to download.
-    b.  Click on the `Source code (zip)` link within the latest release to download.
-4.
-    a.  Place the .zip into your windower directory.
-    b.  Place the .zip into your `~\windower\addons\` directory.
-5.
-    a.  Right-click the .zip file and select *Extract here*.
-    b.  Right-click the .zip file and selec *Extract here*, rename the extracted folder to `MusicBox`.
+3.  \
+    a.  Click on the `MusicBox-vX.X.X.zip` link within the latest release to download.  
+    b.  Click on the `Source code (zip)` link within the latest release to download.  
+4.  \
+    a.  Place the .zip into your windower directory.  
+    b.  Place the .zip into your `~\windower\addons\` directory.  
+5.  \
+    a.  Right-click the .zip file and select *Extract here*.  
+    b.  Right-click the .zip file and selec *Extract here*, rename the extracted folder to `MusicBox`.  
 6.   Use `lua load musicbox` to load the addon.
 
 ___
