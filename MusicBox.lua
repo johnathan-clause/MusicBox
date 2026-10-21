@@ -147,7 +147,6 @@ local help = {
                 'categories'
             },
             all = T{
-                '*',
                 'a',
                 'all',
             }
@@ -866,18 +865,6 @@ windower.register_event('outgoing chunk', function(id, data)
         end
     end
 end) 
-
-windower.register_event('outgoing chunk', function(id, data) 
-    if id == packets.outbound.action.id then
-        local packet = _packets.parse('outgoing', data)
-        if packet.Category == packets.outbound.action.categories.disengage then
-            local cond_args = {[getTOTD()] = true}
-            local c,r,f = getConditionalObj(cond_args)
-            requestInject()
-            handleInjectionNeeds(cond_args)
-        end
-    end
-end)
 
 windower.register_event('time change', function(new, old) 
     if 
